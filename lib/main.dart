@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,14 +7,41 @@ import 'package:isar/isar.dart';
 import 'package:isar_db_test/product_db_model.dart';
 import 'package:path_provider/path_provider.dart';
 
-void main() async{
-  WidgetsFlutterBinding.ensureInitialized();
+isolateDbFn(dynamic token) async {
+  BackgroundIsolateBinaryMessenger.ensureInitialized(token);
+  // WidgetsFlutterBinding.ensureInitialized();
   final dir = await getApplicationSupportDirectory();
   if (dir.existsSync()) {
+    print(dir.path);
     final isar = await Isar.open([ProductDbModelSchema], directory: dir.path);
-    runApp(MyApp(isar: isar,));
+    Future.delayed(Duration(seconds: 8), () async {
+      final product = await isar.productDbModels.get(45678);
+      print(product?.name ?? "no namefound");
+
+      final newProduct = ProductDbModel()..name = 'Custom Product'..description = "Custom Description"..price = 456.12;
+
+      await isar.writeTxn(() async {
+        await isar.productDbModels.put(newProduct);
+      });
+
+      final existingUser = isar.productDbModels.filter().nameContains('Custom Product'); // get
+      print(existingUser);
+    });
   }
-  
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final token = RootIsolateToken.instance;
+  final dir = await getApplicationSupportDirectory();
+  if (dir.existsSync()) {
+    print(dir.path);
+    final isar = await Isar.open([ProductDbModelSchema], directory: dir.path);
+    Isolate.spawn(isolateDbFn, token);
+    runApp(MyApp(
+      isar: isar,
+    ));
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -28,7 +56,10 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: MyHomePage(title: 'Flutter Demo Home Page', isar: isar,),
+      home: MyHomePage(
+        title: 'Flutter Demo Home Page',
+        isar: isar,
+      ),
     );
   }
 }
@@ -58,7 +89,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void initState() {
-    getFakeProducts();
+    // getFakeProducts();
     super.initState();
   }
 
@@ -83,22 +114,19 @@ class _MyHomePageState extends State<MyHomePage> {
             const SizedBox(
               height: 30,
             ),
-
             TextField(
               controller: textController,
             ),
-
             SizedBox(
               height: 50,
             ),
-
             ElevatedButton(
               onPressed: () {
                 fetchFakeProduct(textController.text);
-              }, 
+              },
               child: Text("Fetch Record"),
-              ),
-              productName!= "" ? Text(productName) : const SizedBox(),
+            ),
+            productName != "" ? Text(productName) : const SizedBox(),
           ],
         ),
       ),
@@ -110,8 +138,9 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  Future getFakeProducts() async{
-    var productList = convertJsonToList(await rootBundle.loadString('assets/products-1.json'));
+  Future getFakeProducts() async {
+    var productList = convertJsonToList(
+        await rootBundle.loadString('assets/products-1.json'));
 
     await widget.isar.writeTxn(() async {
       await widget.isar.clear();
@@ -120,56 +149,65 @@ class _MyHomePageState extends State<MyHomePage> {
     await widget.isar.writeTxn(() async {
       await widget.isar.productDbModels.importJson(productList);
 
-      productList = convertJsonToList(await rootBundle.loadString('assets/products-2.json'));
+      productList = convertJsonToList(
+          await rootBundle.loadString('assets/products-2.json'));
       await widget.isar.productDbModels.importJson(productList);
 
-      productList = convertJsonToList(await rootBundle.loadString('assets/products-3.json'));
+      productList = convertJsonToList(
+          await rootBundle.loadString('assets/products-3.json'));
       await widget.isar.productDbModels.importJson(productList);
 
-      productList = convertJsonToList(await rootBundle.loadString('assets/products-4.json'));
+      productList = convertJsonToList(
+          await rootBundle.loadString('assets/products-4.json'));
       await widget.isar.productDbModels.importJson(productList);
 
-      productList = convertJsonToList(await rootBundle.loadString('assets/products-5.json'));
+      productList = convertJsonToList(
+          await rootBundle.loadString('assets/products-5.json'));
       await widget.isar.productDbModels.importJson(productList);
 
-      productList = convertJsonToList(await rootBundle.loadString('assets/products-6.json'));
+      productList = convertJsonToList(
+          await rootBundle.loadString('assets/products-6.json'));
       await widget.isar.productDbModels.importJson(productList);
 
-      productList = convertJsonToList(await rootBundle.loadString('assets/products-7.json'));
+      productList = convertJsonToList(
+          await rootBundle.loadString('assets/products-7.json'));
       await widget.isar.productDbModels.importJson(productList);
 
-      productList = convertJsonToList(await rootBundle.loadString('assets/products-8.json'));
+      productList = convertJsonToList(
+          await rootBundle.loadString('assets/products-8.json'));
       await widget.isar.productDbModels.importJson(productList);
 
-      productList = convertJsonToList(await rootBundle.loadString('assets/products-9.json'));
+      productList = convertJsonToList(
+          await rootBundle.loadString('assets/products-9.json'));
       await widget.isar.productDbModels.importJson(productList);
 
-      productList = convertJsonToList(await rootBundle.loadString('assets/products-10.json'));
+      productList = convertJsonToList(
+          await rootBundle.loadString('assets/products-10.json'));
       await widget.isar.productDbModels.importJson(productList);
     });
-    }
+  }
 
+  List<Map<String, dynamic>> convertJsonToList(jsonData) {
+    // Decode the JSON string
+    final decodedData = jsonDecode(jsonData) as List;
 
-    List<Map<String, dynamic>> convertJsonToList(jsonData) {
-      // Decode the JSON string
-      final decodedData = jsonDecode(jsonData) as List;
+    // Cast each element to a Map<String, dynamic>
+    return decodedData.cast<Map<String, dynamic>>();
+  }
 
-      // Cast each element to a Map<String, dynamic>
-      return decodedData.cast<Map<String, dynamic>>();
-    }
+  Future fetchFakeProduct(productId) async {
+    final stopwatch = Stopwatch();
+    stopwatch.start();
+    final product = await widget.isar.productDbModels.get(int.parse(productId));
+    stopwatch.stop();
+    print(product);
 
-    Future fetchFakeProduct(productId) async{
-      final stopwatch = Stopwatch();
-      stopwatch.start();
-      final product = await widget.isar.productDbModels.get(int.parse(productId));
-      stopwatch.stop();
+    Duration elapsed = stopwatch.elapsed;
 
-      Duration elapsed = stopwatch.elapsed;
+    print(elapsed);
 
-      print(elapsed);
-
-      setState(() {
-        productName = product?.name ?? '';
-      });
-    }
+    setState(() {
+      productName = product?.name ?? '';
+    });
+  }
 }
